@@ -22,9 +22,21 @@ const svg2_RENAME = d3.select("#lineChart2")
 // const tooltip = ...
 
 // 2.a: LOAD...
-d3.csv("YOUR_CSV_NAME.csv").then(data => {
+d3.csv("/weather.csv").then(data => {
     // 2.b: ... AND TRANSFORM DATA
+    let transformedData = [];
+    data.forEach(d => {
+        ["actual_mean_temp", "actual_min_temp", "actual_max_temp"].forEach(type => {
+            transformedData.push({
+                date: d.date,
+                city: d.city,
+                temp_type: type,
+                temperature: +d[type]  // Convert to numeric
+            });
+        });
+    });
 
+    console.log(transformedData);
     // 3.a: SET SCALES FOR CHART 1
 
 
