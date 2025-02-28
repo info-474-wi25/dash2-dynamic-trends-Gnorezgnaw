@@ -11,32 +11,28 @@ const svg1_RENAME = d3.select("#lineChart1") // If you change this ID, you must 
     .append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-const svg2_RENAME = d3.select("#lineChart2")
-    .append("svg")
-    .attr("width", width + margin.left + margin.right)
-    .attr("height", height + margin.top + margin.bottom)
-    .append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
-
 // (If applicable) Tooltip element for interactivity
 // const tooltip = ...
 
 // 2.a: LOAD...
 d3.csv("/weather.csv").then(data => {
-    // 2.b: ... AND TRANSFORM DATA
-    // - X: Date
-    // - Y: Average Precipitation
-    // - Category: City
+    const parseDate = d3.timeParse("%m/%d/%Y");
+
     data.forEach(d => {
-        d.year = new Date(d.date).getFullYear();
+        d.date = parseDate(d.date.trim());
+        d.year = d.date.getFullYear();
+        d.month = d.date.getMonth() + 1;
         d.avgPrecip = +d.average_precipitation;
     });
 
+    console.log(data);
 
-    console.log(transformedData);
+    const globalMinY = 0;  // Start from 0
+    const globalMaxY = d3.max(data, d => d.avgPrecip);
 
     const uniqueCities = [...new Set(data.map(d => d.city))];
-    const dropdown = d3.select("#cityDropdown"); // Ensure you have a <select id="cityDropdown"> in index.html
+
+    const dropdown = d3.select("#cityDropdown");
     dropdown.selectAll("option")
         .data(uniqueCities)
         .enter()
@@ -48,99 +44,90 @@ d3.csv("/weather.csv").then(data => {
 
     function updateChart(city) {
         // Filter Data for Selected City
-        const filteredData = data.filter(d => d.city === city);
-    // 3.a: SET SCALES FOR CHART 1
+        const filteredData = data.filter(d => d.city === city && !isNaN(d.avgPrecip));
+
+        // 3.a: GROUP AND AGGREGATE DATA
+        // "For each [MONTH], I want the {average of} [AVERAGE PRECIPITATION]."
+        const groupedData = d3.groups(filteredData, d => `${d.year}-${d.month}`)
+            .map(([yearMonth, entries]) => {
+                const [year, month] = yearMonth.split('-').map(Number);
+                return {
+                    year,
+                    month,
+                    avgPrecip: d3.mean(entries, e => e.avgPrecip)
+                };
+            });
+
+        // Handle empty data
+        if (groupedData.length === 0) {
+            console.warn(`No data available for city: ${city}`);
+            svg1_RENAME.selectAll("*").remove();
+            return;
+        }
+
+        console.log("Grouped Data:", groupedData);
+
+        // 3.b: SET SCALES FOR CHART 1
         const xScale = d3.scaleTime()
-        .domain(d3.extent(filteredData, d => d.date))
-        .range([0, width]);
+            .domain(d3.extent(groupedData, d => new Date(d.year, d.month - 1)))
+            .range([0, width]);
 
-        const yScale = d3.scaleLinear()
-        .domain([0, d3.max(filteredData, d => d.avgPrecip)])
-        .range([height, 0]);
+            const yScale = d3.scaleLinear()
+            .domain([globalMinY, globalMaxY])
+            .range([height, 0]);
 
-
-    // 4.a: PLOT DATA FOR CHART 1
+        // 4.a: PLOT DATA FOR CHART 1
         const line = d3.line()
-                .x(d => xScale(d.date))
-                .y(d => yScale(d.avgPrecip))
-                .curve(d3.curveMonotoneX);
+            .x(d => xScale(new Date(d.year, d.month - 1)))
+            .y(d => yScale(d.avgPrecip))
+            .curve(d3.curveMonotoneX);
 
-        svg1.selectAll("*").remove();
+        // 5.a: CLEAR PREVIOUS ELEMENTS
+        svg1_RENAME.selectAll("*").remove();
 
-
-    // 5.a: ADD AXES FOR CHART 1
-        svg1.append("g")
+        // 6.a: ADD AXES FOR CHART 1
+        svg1_RENAME.append("g")
             .attr("transform", `translate(0,${height})`)
             .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %Y")));
 
-        svg1.append("g").call(d3.axisLeft(yScale));
+        svg1_RENAME.append("g").call(d3.axisLeft(yScale));
+
+        // 7.a: ADD LABELS FOR CHART 1
+        svg1_RENAME.append("text")
+            .attr("x", width / 2)
+            .attr("y", -10)
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .text(`Average Precipitation Per Month (${city})`);
+
+        svg1_RENAME.append("text")
+            .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
+            .style("text-anchor", "middle")
+            .text("Date");
+
+        svg1_RENAME.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", -margin.left + 15)
+            .attr("x", -height / 2)
+            .style("text-anchor", "middle")
+            .text("Avg Precipitation (inches)");
 
 
-    // 6.a: ADD LABELS FOR CHART 1
-        svg1.append("text")
-        .attr("x", width / 2)
-        .attr("y", -10)
-        .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .text(`Average Precipitation Over Time (${city})`);
+        // 9.a: ADD LINE PATH
+        svg1_RENAME.append("path")
+            .datum(groupedData)
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 2)
+            .attr("d", line);
+    }
 
-    svg1.append("text")
-        .attr("transform", `translate(${width / 2}, ${height + margin.bottom - 10})`)
-        .style("text-anchor", "middle")
-        .text("Date");
-
-    svg1.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", -margin.left + 15)
-        .attr("x", -height / 2)
-        .style("text-anchor", "middle")
-        .text("Avg Precipitation (inches)");
-
-    // 7.a: ADD INTERACTIVITY FOR CHART 1 (Hover Tooltip)
-    const tooltip = d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("opacity", 0)
-        .style("position", "absolute")
-        .style("background", "#f9f9f9")
-        .style("border", "1px solid #ccc")
-        .style("padding", "5px")
-        .style("border-radius", "5px");
-
-    svg1.selectAll("circle")
-        .data(filteredData)
-        .enter()
-        .append("circle")
-        .attr("cx", d => xScale(d.date))
-        .attr("cy", d => yScale(d.avgPrecip))
-        .attr("r", 4)
-        .style("fill", "steelblue")
-        .on("mouseover", (event, d) => {
-            tooltip.transition().duration(200).style("opacity", 1);
-            tooltip.html(`Date: ${d3.timeFormat("%b %d, %Y")(d.date)}<br>Avg Precip: ${d.avgPrecip.toFixed(2)} inches`)
-                .style("left", (event.pageX + 10) + "px")
-                .style("top", (event.pageY - 30) + "px");
-        })
-        .on("mouseout", () => {
-            tooltip.transition().duration(500).style("opacity", 0);
-        });
-
-    // Add Line Path
-    svg1.append("path")
-        .datum(filteredData)
-        .attr("fill", "none")
-        .attr("stroke", "steelblue")
-        .attr("stroke-width", 2)
-        .attr("d", line);
-}
-
-    // Initial Chart Rendering (Default City)
+    // 10.a: INITIAL CHART RENDERING
     updateChart(selectedCity);
 
-    // Update Chart When City is Selected
+    // 11.a: UPDATE CHART WHEN CITY IS SELECTED
     dropdown.on("change", function () {
         selectedCity = this.value;
         updateChart(selectedCity);
     });
-
-
 });
