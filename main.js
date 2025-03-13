@@ -27,7 +27,7 @@ d3.csv("/weather.csv").then(data => {
 
     console.log(data);
 
-    const globalMinY = 0;  // Start from 0
+    const globalMinY = 0;
     const globalMaxY = d3.max(data, d => d.avgPrecip);
 
     const uniqueCities = [...new Set(data.map(d => d.city))];
@@ -97,7 +97,8 @@ d3.csv("/weather.csv").then(data => {
             .attr("x", width / 2)
             .attr("y", -10)
             .attr("text-anchor", "middle")
-            .style("font-size", "16px")
+            .style("font-size", "24px")
+            .style("font-weight", "bold")
             .text(`Average Precipitation Per Month (${city})`);
 
         svg1_RENAME.append("text")
