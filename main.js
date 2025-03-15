@@ -15,7 +15,7 @@ const svg1_RENAME = d3.select("#lineChart1") // If you change this ID, you must 
 // const tooltip = ...
 
 // 2.a: LOAD...
-d3.csv("/weather.csv").then(data => {
+d3.csv("weather.csv").then(data => {
     const parseDate = d3.timeParse("%m/%d/%Y");
 
     data.forEach(d => {
